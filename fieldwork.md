@@ -9,7 +9,7 @@
 - **What I saw:** the canteen was packed. I placed my own order soon after I arrived and still hadn't received it when I left at about 1:00 am, so I left without it. Even someone standing right there for half an hour couldn't get their order.
 
 ## Photos
-Original files from my phone camera; the time each was taken is in the photo's metadata.
+I took these on my phone on 17 Nov. The copies in this repo came through WhatsApp, which strips the photo's timestamp data and renames files with the time they were sent (23:03), not the time they were taken. The originals with full timestamps are on my phone and I can show them on the call.
 
 | File | Taken | What it shows |
 |---|---|---|
