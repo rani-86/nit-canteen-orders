@@ -1,0 +1,22 @@
+row_id,source,date,raw_text,item,variant,portion,qty,modifications,parcel,group_id,group_total,time_ordered,time_served,how_identified,issue,notes
+1,notepad_p1,2026-11-17,"(1) vg ?dl 1/2",noodles?,veg,half,1,,N,G1,315,,,,,circled 1 before the item - table number?; item word unclear
+2,notepad_p1,2026-11-17,"egg ditto ditto 1/2",noodles?,egg,half,1,,N,G1,315,,,,,ditto marks = same item as row 1
+3,notepad_p1,2026-11-17,"masala omlet 2",omelette,masala,full,2,,N,G1,315,,,,,qty looks like 2 - could be 1/2 - check photo
+4,notepad_p1,2026-11-17,"egg vg?? 1/2",?,egg,half,1,,N,G1,315,,,,,item word unreadable
+5,notepad_p1,2026-11-17,"egg ch? 1/2",chowmein?,egg,half,1,,N,G1,315,,,,,prices 140/120/30/25 written beside rows 2-5; group total 315
+6,notepad_p1,2026-11-17,"(P) chicken ?dl 1/2",noodles?,chicken,half,1,,Y,,,,,,,
+7,notepad_p1,2026-11-17,"vg maggi (P) 1",maggi,veg,full,1,,Y,,,,,,,
+8,notepad_p1,2026-11-17,"vg ?dl 1/2+1",noodles?,veg,?,?,,N,G2,,,,,,1/2+1 = one half plate + one full? - check; bracket joins rows 8-9
+9,notepad_p1,2026-11-17,"? + chow 1/2",chowmein,?,half,1,,N,G2,,,,,,first word unclear
+10,notepad_p2,2026-11-17,"(1) chicken ?dl 1+1/2?",noodles?,chicken,?,?,,N,,,,,,,circled 1 again - table number?; qty unclear
+11,notepad_p2,2026-11-17,"vg ?dl (corn) 1/2 + [crossed out]",noodles?,veg,half,1,corn,N,,,,,,,second qty crossed out - order changed?
+12,notepad_p2,2026-11-17,"vg maggi (mixed) 1/2 / garlic (?)",maggi,veg,half,1,mixed; garlic (?),N,,,,,,,next line 'garlic (...)' looks like an add-on to this order
+13,notepad_p2,2026-11-17,"vg ?dl 1/2 / corn+garlic ?? no",noodles?,veg,half,1,corn+garlic; ? no,N,,,,,,,'no' written under the add-ons - something removed (onion?) - word unclear
+14,notepad_p2,2026-11-17,"chicken egg chow (P) 1/2",chowmein,chicken egg,half,1,,Y,,,,,,,
+15,notepad_p2,2026-11-17,"vg chow 1+1/2?",chowmein,veg,?,?,,N,G3,160,,,,,prices 70/40/50 beside rows 15-17; group total 160
+16,notepad_p2,2026-11-17,"masala omlet 1?",omelette,masala,full,1,,N,G3,160,,,,,qty unclear
+17,notepad_p2,2026-11-17,"vg chow 1/2 + [crossed out]",chowmein,veg,half,1,,N,G3,160,,,,,second qty crossed out
+18,notepad_p2,2026-11-17,"vg ?dl 1/2",noodles?,veg,half,1,,N,,,,,,,
+19,notepad_p2,2026-11-17,"egg 1/2",?,egg,half,1,,N,,,,,,,only 'egg' written - egg what?
+20,notepad_p2,2026-11-17,"vg ?dl (10) [qty overwritten]",noodles?,veg,?,?,,N,,,,,,,circled 10 - table number?; qty overwritten
+21,notepad_p2,2026-11-17,"omlet 2",omelette,plain?,full,2,,N,,,,,,,
