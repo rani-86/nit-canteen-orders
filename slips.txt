@@ -1,0 +1,18 @@
+#01 | VEG NOODLES (?)            | HALF x1 | -                        | DINE-IN | row 1  !! LOOK-ALIKE
+#02 | EGG NOODLES (?)            | HALF x1 | -                        | DINE-IN | row 2
+#03 | MASALA OMELETTE            | FULL x2 | -                        | DINE-IN | row 3
+#04 | EGG CHOWMEIN (?)           | HALF x1 | -                        | DINE-IN | row 5
+#05 | CHICKEN NOODLES (?)        | HALF x1 | -                        | PARCEL  | row 6
+#06 | VEG MAGGI                  | FULL x1 | -                        | PARCEL  | row 7
+#07 | VEG NOODLES (?)            | ?    x? | -                        | DINE-IN | row 8  !! LOOK-ALIKE
+#08 | CHICKEN NOODLES (?)        | ?    x? | -                        | DINE-IN | row 10
+#09 | VEG NOODLES (?)            | HALF x1 | corn                     | DINE-IN | row 11  !! LOOK-ALIKE
+#10 | VEG MAGGI                  | HALF x1 | mixed; garlic (?)        | DINE-IN | row 12
+#11 | VEG NOODLES (?)            | HALF x1 | corn+garlic; ? no        | DINE-IN | row 13  !! LOOK-ALIKE
+#12 | CHICKEN EGG CHOWMEIN       | HALF x1 | -                        | PARCEL  | row 14
+#13 | VEG CHOWMEIN               | ?    x? | -                        | DINE-IN | row 15  !! LOOK-ALIKE
+#14 | MASALA OMELETTE            | FULL x1 | -                        | DINE-IN | row 16
+#15 | VEG CHOWMEIN               | HALF x1 | -                        | DINE-IN | row 17  !! LOOK-ALIKE
+#16 | VEG NOODLES (?)            | HALF x1 | -                        | DINE-IN | row 18  !! LOOK-ALIKE
+#17 | VEG NOODLES (?)            | ?    x? | -                        | DINE-IN | row 20  !! LOOK-ALIKE
+#18 | PLAIN OMELETTE (?)         | FULL x2 | -                        | DINE-IN | row 21
