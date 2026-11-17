@@ -1,7 +1,7 @@
 # Research — Order mix-ups at the NIT Canteen night counter
 
 **Place:** NIT Canteen, NIT Jamshedpur campus — within walking distance of my hostel
-**Person:** Canteen Bhaiya, the order-taker at the counter. He takes orders, packs them, does the garnishing and calls out names at hand-over. A second person does the cooking.
+**Person:** Kamal Singh ("Canteen Bhaiya"), the order-taker at the counter. He takes orders, packs them, does the garnishing and calls out names at hand-over. A second person does the cooking.
 **Date observed:** 17 Nov 2026, ~11 pm
 **Author:** Rani
 
