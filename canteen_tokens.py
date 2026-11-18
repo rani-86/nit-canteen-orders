@@ -26,6 +26,7 @@ Only uses the Python standard library.
 
 import csv
 import html
+import json
 import math
 import sys
 from collections import Counter, defaultdict
@@ -47,6 +48,7 @@ OBSERVED_EXTRAS = ["Spicy+", "Less spicy", "Cheese+", "No onion", "No corn", "Le
 
 SLIPS_FILE = "slips.txt"
 PAD_FILE = "order_pad.html"
+PAD_LAYOUT_FILE = "order_pad_layout.json"   # tells order_ocr.py which columns the printed pad has
 # ---------------------------------------------------------
 
 REQUIRED_COLUMNS = ["source", "item", "variant"]   # can't analyse orders without these
@@ -63,6 +65,12 @@ def clean(value):
 def unknown(value):
     """True if the value is blank or just question marks (couldn't read it)."""
     return value.replace("?", "").strip() == ""
+
+
+def has_readable_dish(row):
+    """Item must be readable. Variant may be blank (e.g. 'chai'), but not just '?'."""
+    variant = row.get("variant") or ""
+    return not unknown(row.get("item") or "") and not (variant.strip() and unknown(variant))
 
 
 def parse_time(text):
@@ -133,8 +141,6 @@ def check_row(row, seen_ids):
     seen_ids.add(rid)
     if not row["item"]:
         problems.append("item is empty")
-    if not row["variant"]:
-        problems.append("variant is empty")
     if row["portion"] not in ("half", "full", "?", ""):
         problems.append(f"portion '{row['portion']}' should be half/full")
     qty = row["qty"]
@@ -319,13 +325,16 @@ def choose_tick_boxes(extra_counts, observed=OBSERVED_EXTRAS, limit=MAX_TICK_BOX
 
 
 def write_order_pad(path, boxes, rows=PAD_ROWS):
-    """A printable A4 (landscape) order pad. Row number = token number."""
-    head = "".join(f"<th class='tick'>{html.escape(b)}</th>" for b in boxes)
-    ticks = "<td class='tick'>&#9744;</td>" * len(boxes)
+    """A printable A4 (landscape) order pad. Row number = token number.
+    Kamal writes only the dish on each row; everything else is ticked ONLY
+    when it differs from the usual order (blank = full plate, dine-in,
+    no extras, qty 1)."""
+    ticks = ["Half", "Parcel"] + list(boxes)
+    sub_head = "".join(f"<th class='tick'>{html.escape(t)}</th>" for t in ticks)
+    empty = "<td class='tick'></td>" * len(ticks)
     body = "".join(
-        f"<tr><td class='num'>{n:02d}</td><td class='who'></td><td class='dish'></td>"
-        f"<td class='qty'></td><td class='pick'>H &nbsp;/&nbsp; F</td>"
-        f"<td class='pick'>P &nbsp;/&nbsp; D</td>{ticks}<td class='other'></td></tr>"
+        f"<tr><td class='num'>{n:02d}</td><td class='dish'></td><td class='qty'></td>"
+        f"{empty}<td class='other'></td></tr>"
         for n in range(1, rows + 1))
     page = f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>NIT Canteen order pad</title>
@@ -335,29 +344,41 @@ def write_order_pad(path, boxes, rows=PAD_ROWS):
   h1 {{ font-size: 15px; margin: 0 0 3px; }}
   .meta {{ font-size: 11px; margin-bottom: 5px; }}
   table {{ border-collapse: collapse; width: 100%; font-size: 10px; }}
-  th, td {{ border: 1px solid #333; padding: 0 3px; height: 5.9mm; }}
-  th {{ background: #eee; font-size: 9px; }}
-  td.num {{ width: 7mm; font-weight: bold; text-align: center; font-size: 12px; }}
-  td.who {{ width: 30mm; }}
-  td.dish {{ width: 48mm; }}
+  th, td {{ border: 1px solid #555; padding: 0 3px; height: 6.1mm; }}
+  th {{ background: #e8e8e8; font-size: 9px; height: 5mm; }}
+  th.group {{ background: #d6d6d6; font-size: 10px; }}
+  tr:nth-child(even) td {{ background: #f4f4f4; }}
+  td.num {{ width: 8mm; font-weight: bold; text-align: center; font-size: 12px; }}
+  td.dish {{ width: 62mm; }}
   td.qty {{ width: 9mm; }}
-  td.pick {{ width: 15mm; text-align: center; color: #555; }}
-  th.tick {{ width: 13mm; }}
-  td.tick {{ text-align: center; font-size: 13px; }}
+  th.tick {{ width: 12mm; }}
   .note {{ font-size: 9px; margin-top: 3px; color: #444; }}
 </style></head><body>
 <h1>NIT Canteen &mdash; order pad</h1>
 <div class="meta">Date: ____________ &nbsp; Page: ____ &nbsp;&nbsp;
-Give the student the token with the same number as the row. Call the number when it's ready.</div>
+Give the student the token with the row number. Call the number when it's ready.</div>
 <table>
-<tr><th>No.</th><th>Name / ID</th><th>Dish</th><th>Qty</th><th>Half / Full</th>
-<th>Parcel / Dine-in</th>{head}<th>Other instructions</th></tr>
+<tr><th rowspan="2">No.</th><th rowspan="2">Dish</th><th rowspan="2">Qty</th>
+<th class="group" colspan="{len(ticks)}">Tick only if needed</th>
+<th rowspan="2">Other instructions</th></tr>
+<tr>{sub_head}</tr>
 {body}
 </table>
-<div class="note">Circle H or F, and P or D. Tick any extras; write anything else under "Other instructions".</div>
+<div class="note">Blank means the usual: full plate, dine-in, no extras, qty 1.
+Write only the dish; tick or write anything that's different.</div>
 </body></html>"""
     with open(path, "w", encoding="utf-8") as out:
         out.write(page)
+
+
+def write_pad_layout(path, boxes, rows=PAD_ROWS):
+    """Save the printed pad's columns so order_ocr.py reads the right tick boxes.
+    If the tick boxes ever change, reprint the pad."""
+    ticks = ["Half", "Parcel"] + list(boxes)
+    layout = {"rows": rows, "ticks": ticks,
+              "columns": ["No.", "Dish", "Qty"] + ticks + ["Other instructions"]}
+    with open(path, "w", encoding="utf-8") as out:
+        json.dump(layout, out, indent=2)
 
 
 def write_slips(path, rows, lookalike_ids):
@@ -393,7 +414,7 @@ def main():
         if problems:
             print(f"  WARNING line {r['_line']} (row {r['row_id']}): " + "; ".join(problems))
 
-    readable = [r for r in rows if not unknown(r["item"]) and not unknown(r["variant"])]
+    readable = [r for r in rows if has_readable_dish(r)]
     unreadable = [r["row_id"] for r in rows if r not in readable]
     print(f"\nRead {len(rows)} orders. {len(readable)} with a readable dish, "
           f"{len(unreadable)} without (rows {', '.join(unreadable) or '-'}).")
@@ -472,6 +493,7 @@ def main():
     extra_counts = count_extras(rows)
     boxes = choose_tick_boxes(extra_counts)
     write_order_pad(PAD_FILE, boxes)
+    write_pad_layout(PAD_LAYOUT_FILE, boxes)
     seen = ", ".join(f"{n} ({c})" for n, c in extra_counts.most_common()) or "none"
     print(f"Order pad with {PAD_ROWS} numbered rows written to {PAD_FILE}.")
     print(f"  Extras in the data: {seen}  -> tick box if seen {MIN_DATA_EXTRA}+ times")

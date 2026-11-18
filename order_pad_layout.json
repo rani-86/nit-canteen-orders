@@ -1,0 +1,29 @@
+{
+  "rows": 25,
+  "ticks": [
+    "Half",
+    "Parcel",
+    "Corn",
+    "Spicy+",
+    "Less spicy",
+    "Cheese+",
+    "No onion",
+    "No corn",
+    "Less oil"
+  ],
+  "columns": [
+    "No.",
+    "Dish",
+    "Qty",
+    "Half",
+    "Parcel",
+    "Corn",
+    "Spicy+",
+    "Less spicy",
+    "Cheese+",
+    "No onion",
+    "No corn",
+    "Less oil",
+    "Other instructions"
+  ]
+}

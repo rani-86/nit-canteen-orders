@@ -56,10 +56,13 @@ class CheckRowTests(unittest.TestCase):
     def test_unreadable_values_are_allowed(self):
         self.assertEqual(ct.check_row(order(portion="?", qty="?"), set()), [])
 
-    def test_empty_item_and_variant_are_flagged(self):
-        problems = ct.check_row(order(item="", variant=""), set())
-        self.assertIn("item is empty", problems)
-        self.assertIn("variant is empty", problems)
+    def test_empty_item_is_flagged(self):
+        self.assertIn("item is empty", ct.check_row(order(item=""), set()))
+
+    def test_blank_variant_is_a_readable_dish_but_question_mark_is_not(self):
+        self.assertTrue(ct.has_readable_dish(order(item="chai", variant="")))
+        self.assertFalse(ct.has_readable_dish(order(item="chowmein", variant="?")))
+        self.assertFalse(ct.has_readable_dish(order(item="?", variant="veg")))
 
     def test_zero_and_negative_qty_are_flagged(self):
         self.assertTrue(ct.check_row(order(qty="0"), set()))
@@ -237,9 +240,9 @@ class OrderPadTests(unittest.TestCase):
             ct.write_order_pad(path, ["Spicy+", "No onion"], rows=3)
             with open(path, encoding="utf-8") as f:
                 text = f.read()
-        for expected in ("No.", "Name / ID", "Dish", "Qty", "Half / Full",
-                         "Parcel / Dine-in", "Spicy+", "No onion", "Other instructions",
-                         ">01<", ">03<"):
+        for expected in ("No.", "Dish", "Qty", "Tick only if needed", ">Half<", ">Parcel<",
+                         "Spicy+", "No onion", "Other instructions",
+                         "Blank means the usual", ">01<", ">03<"):
             self.assertIn(expected, text)
         self.assertNotIn(">04<", text)
 
@@ -252,7 +255,9 @@ class RealDataTests(unittest.TestCase):
     def test_real_data_numbers_match_the_readme(self):
         rows, issues, fatal = ct.read_orders("data.csv")
         self.assertIsNone(fatal)
-        readable = [r for r in rows if not ct.unknown(r["item"]) and not ct.unknown(r["variant"])]
+        # only my fieldwork rows - orders imported later from pad photos are excluded
+        rows = [r for r in rows if r["source"].startswith("notepad_")]
+        readable = [r for r in rows if ct.has_readable_dish(r)]
         risk = ct.summarise_risks(readable)
         self.assertEqual((len(rows), len(readable)), (21, 18))
         self.assertEqual(len(risk["exposed"]), 8)                        # 8 of 18 = 44%
