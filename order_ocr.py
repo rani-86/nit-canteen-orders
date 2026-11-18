@@ -11,7 +11,8 @@ and its columns are saved in order_pad_layout.json. This module:
   3. reads the tick boxes (Half, Parcel, extras) with plain image processing:
      the share of dark pixels in each cell. Faint marks are flagged for checking;
   4. reads the handwriting (Dish, Qty, Other instructions) with a vision API
-     ONLY if ANTHROPIC_API_KEY is set. Without a key - or if the API fails -
+     ONLY if a key is set: GEMINI_API_KEY (Google's free tier) or
+     ANTHROPIC_API_KEY. Without a key - or if the API fails -
      those fields stay blank and the user types them from the row pictures.
      Standard Tesseract OCR is not used: it is not reliable on handwriting;
   5. after the user has checked everything (see ocr_app.py), validates the
@@ -43,10 +44,14 @@ EDGE_MARGIN = 20               # the table's outer border lands this far inside 
 LAYOUT_FILE = "order_pad_layout.json"
 DATA_FILE = "data.csv"
 
+API_TIMEOUT = 60               # seconds
+# Google Gemini - has a free tier (rate-limited)
+GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+GEMINI_MODEL = os.environ.get("CANTEEN_GEMINI_MODEL", "gemini-2.5-flash")
+# Anthropic Claude - paid
 API_URL = "https://api.anthropic.com/v1/messages"
 API_VERSION = "2023-06-01"
 API_MODEL = os.environ.get("CANTEEN_OCR_MODEL", "claude-haiku-5-5")
-API_TIMEOUT = 60               # seconds
 
 # variant words at the start of a dish name ("veg maggi" -> variant veg, item maggi)
 VARIANTS = ["mix non veg", "mix non-veg", "mix veg", "chicken egg", "veg", "egg",
@@ -173,7 +178,7 @@ def with_edges(lines, first, last, near=15):
     return lines
 
 
-def find_grid(table_rgb, layout):
+def find_grid(table_rgb, layout, add_edges=True):
     """Return (row_lines, col_lines) in the straightened table, or raise OcrError.
     A line counts if it runs across at least half the table. Lines are thickened
     a little first, so a slightly wavy line in a photo still counts as one line."""
@@ -184,10 +189,11 @@ def find_grid(table_rgb, layout):
     thick_v = cv2.dilate(mask, np.ones((1, 5), np.uint8))
     horiz = cv2.morphologyEx(thick_h, cv2.MORPH_OPEN, np.ones((1, max(w // 20, 10)), np.uint8))
     vert = cv2.morphologyEx(thick_v, cv2.MORPH_OPEN, np.ones((max(h // 20, 10), 1), np.uint8))
-    rows = with_edges(line_positions((horiz > 0).sum(axis=1), 0.5 * w),
-                      EDGE_MARGIN, h - EDGE_MARGIN)
-    cols = with_edges(line_positions((vert > 0).sum(axis=0), 0.6 * h),
-                      EDGE_MARGIN, w - EDGE_MARGIN)
+    rows = line_positions((horiz > 0).sum(axis=1), 0.5 * w)
+    cols = line_positions((vert > 0).sum(axis=0), 0.6 * h)
+    if add_edges:                     # only valid on a straightened table
+        rows = with_edges(rows, EDGE_MARGIN, h - EDGE_MARGIN)
+        cols = with_edges(cols, EDGE_MARGIN, w - EDGE_MARGIN)
     need_cols, need_rows = len(layout["columns"]) + 1, layout["rows"] + 1
     if len(cols) != need_cols:
         raise OcrError(f"Couldn't read the grid: found {len(cols)} column lines, expected "
@@ -267,15 +273,19 @@ def parse_handwriting_reply(text, row_numbers):
     return found
 
 
-def read_handwriting(table, row_numbers, layout, api_key):
-    """Ask a vision model to read Dish, Qty and Other for the given rows only."""
-    if not row_numbers:
-        return {}
-    image = Image.fromarray(table)
-    image.thumbnail((1600, 1600))
-    buffer = io.BytesIO()
-    image.save(buffer, format="JPEG", quality=85)
-    prompt = (
+def handwriting_key():
+    """(provider, key) from the environment. Gemini first, because it has a free tier."""
+    gemini = os.environ.get("GEMINI_API_KEY", "").strip()
+    claude = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+    if gemini:
+        return "gemini", gemini
+    if claude:
+        return "anthropic", claude
+    return None, ""
+
+
+def handwriting_prompt(row_numbers, layout):
+    return (
         "This is a straightened photo of a canteen order pad. Rows are numbered "
         f"01 to {layout['rows']:02d}. Columns, left to right: {', '.join(layout['columns'])}. "
         f"For rows {', '.join(f'{n:02d}' for n in row_numbers)} only, read the handwritten "
@@ -284,23 +294,55 @@ def read_handwriting(table, row_numbers, layout, api_key):
         "blank cell. Write ? for any word you can't read and list that field (dish, qty or "
         "other) in \"unsure\". Reply with JSON only, for example: "
         '{"rows": [{"no": 1, "dish": "veg maggi", "qty": "", "other": "", "unsure": []}]}')
-    body = {"model": API_MODEL, "max_tokens": 2000, "messages": [{"role": "user", "content": [
-        {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg",
-                                     "data": base64.b64encode(buffer.getvalue()).decode()}},
-        {"type": "text", "text": prompt}]}]}
-    request = urllib.request.Request(
-        API_URL, data=json.dumps(body).encode("utf-8"), method="POST",
-        headers={"x-api-key": api_key, "anthropic-version": API_VERSION,
-                 "content-type": "application/json"})
+
+
+def post_json(url, body, headers):
+    request = urllib.request.Request(url, data=json.dumps(body).encode("utf-8"), method="POST",
+                                     headers={"content-type": "application/json", **headers})
     try:
         with urllib.request.urlopen(request, timeout=API_TIMEOUT) as response:
-            payload = json.load(response)
+            return json.load(response)
     except urllib.error.HTTPError as e:
+        if e.code in (401, 403):
+            raise OcrError(f"The API key was rejected ({e.code}) - check it, or remove it and "
+                           "type the dishes.")
+        if e.code == 429:
+            raise OcrError("The free limit for now has been reached (429) - wait a minute "
+                           "and upload again, or type the dishes.")
         raise OcrError(f"The handwriting service returned an error ({e.code}).")
     except (urllib.error.URLError, TimeoutError, OSError):
         raise OcrError("Couldn't reach the handwriting service (no internet?).")
-    text = "".join(block.get("text", "") for block in payload.get("content", [])
-                   if block.get("type") == "text")
+
+
+def read_handwriting(table, row_numbers, layout, api_key, provider="anthropic"):
+    """Ask a vision model to read Dish, Qty and Other for the given rows only."""
+    if not row_numbers:
+        return {}
+    image = Image.fromarray(table)
+    image.thumbnail((1600, 1600))
+    buffer = io.BytesIO()
+    image.save(buffer, format="JPEG", quality=85)
+    picture = base64.b64encode(buffer.getvalue()).decode()
+    prompt = handwriting_prompt(row_numbers, layout)
+    if provider == "gemini":
+        payload = post_json(
+            GEMINI_URL.format(model=GEMINI_MODEL),
+            {"contents": [{"parts": [{"inline_data": {"mime_type": "image/jpeg", "data": picture}},
+                                     {"text": prompt}]}],
+             "generationConfig": {"temperature": 0, "responseMimeType": "application/json"}},
+            {"x-goog-api-key": api_key})
+        parts = ((payload.get("candidates") or [{}])[0].get("content") or {}).get("parts") or []
+        text = "".join(part.get("text", "") for part in parts)
+    else:
+        payload = post_json(
+            API_URL,
+            {"model": API_MODEL, "max_tokens": 2000, "messages": [{"role": "user", "content": [
+                {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg",
+                                             "data": picture}},
+                {"type": "text", "text": prompt}]}]},
+            {"x-api-key": api_key, "anthropic-version": API_VERSION})
+        text = "".join(block.get("text", "") for block in payload.get("content", [])
+                       if block.get("type") == "text")
     return parse_handwriting_reply(text, row_numbers)
 
 
@@ -336,7 +378,7 @@ def build_rows(measured, handwriting, layout):
     return rows, ink_flags
 
 
-def read_order_pad(data, layout, api_key=None):
+def read_order_pad(data, layout, api_key=None, provider="anthropic"):
     """Photo bytes -> everything the verification screen needs.
     Raises OcrError if the table can't be found; handwriting failures are
     reported as warnings and the user types those fields instead."""
@@ -346,7 +388,7 @@ def read_order_pad(data, layout, api_key=None):
     warnings, handwriting, used_api = [], {}, False
     if api_key and filled:
         try:
-            handwriting = read_handwriting(table, filled, layout, api_key)
+            handwriting = read_handwriting(table, filled, layout, api_key, provider)
             used_api = True
         except OcrError as e:
             warnings.append(f"Handwriting wasn't read automatically: {e} "

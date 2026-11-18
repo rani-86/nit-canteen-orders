@@ -101,7 +101,7 @@ class HandwritingTests(unittest.TestCase):
 
     def test_api_text_fills_the_table_and_unsure_is_highlighted(self):
         original = ocr.read_handwriting
-        ocr.read_handwriting = lambda table, rows, layout, key: {
+        ocr.read_handwriting = lambda table, rows, layout, key, provider: {
             1: {"dish": "veg maggi", "qty": "", "other": "", "unsure": []},
             7: {"dish": "chicken ?", "qty": "", "other": "extra sauce", "unsure": ["dish"]}}
         try:
@@ -125,6 +125,49 @@ class HandwritingTests(unittest.TestCase):
             ocr.read_handwriting = original
         self.assertEqual(len(result["rows"]), 8)
         self.assertTrue(result["warnings"])
+
+
+class GeminiTests(unittest.TestCase):
+    def test_gemini_request_and_reply(self):
+        """Fake the network: check what is sent to Gemini and that its reply is read."""
+        import io as _io
+        import urllib.request
+        sent = {}
+
+        class FakeResponse(_io.BytesIO):
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+        def fake_urlopen(request, timeout):
+            sent["url"], sent["headers"] = request.full_url, dict(request.header_items())
+            reply = {"candidates": [{"content": {"parts": [{"text":
+                     '{"rows": [{"no": 2, "dish": "veg maggi", "qty": "", "other": "", "unsure": []}]}'}]}}]}
+            return FakeResponse(json.dumps(reply).encode())
+        original = urllib.request.urlopen
+        urllib.request.urlopen = fake_urlopen
+        try:
+            table = np.full((100, 200, 3), 255, np.uint8)
+            found = ocr.read_handwriting(table, [2], LAYOUT, "free-key", provider="gemini")
+        finally:
+            urllib.request.urlopen = original
+        self.assertIn("generativelanguage.googleapis.com", sent["url"])
+        self.assertEqual(sent["headers"].get("X-goog-api-key"), "free-key")
+        self.assertEqual(found[2]["dish"], "veg maggi")
+
+    def test_gemini_key_is_preferred_because_it_is_free(self):
+        old = {k: os.environ.get(k) for k in ("GEMINI_API_KEY", "ANTHROPIC_API_KEY")}
+        try:
+            os.environ["GEMINI_API_KEY"], os.environ["ANTHROPIC_API_KEY"] = "g", "a"
+            self.assertEqual(ocr.handwriting_key(), ("gemini", "g"))
+            del os.environ["GEMINI_API_KEY"], os.environ["ANTHROPIC_API_KEY"]
+            self.assertEqual(ocr.handwriting_key(), (None, ""))
+        finally:
+            for k, v in old.items():
+                if v is not None:
+                    os.environ[k] = v
 
 
 class ValidateTests(unittest.TestCase):

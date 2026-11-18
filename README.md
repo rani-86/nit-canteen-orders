@@ -114,7 +114,7 @@ Upload photo → read the form → CHECK AND CORRECT every row → Confirm and S
 1. **Find and straighten the table.** The grid lines form one connected block of ink, so the app finds that block, takes its 4 corners and straightens it. This handles a tilted or angled photo, sideways and upside-down photos, and uneven light (thanks to adaptive thresholding).
 2. **Find the grid.** The order number is **never read from the handwriting**. It comes from the row's position on the printed pad. The pad's columns are read from `order_pad_layout.json`, which `canteen_tokens.py` writes whenever it prints the pad.
 3. **Tick boxes** (Half, Parcel and the extras) use plain image processing, not AI: the share of dark pixels in each cell. A clear tick counts as ticked; a faint mark is flagged as "faint mark" for the user to decide. Completely empty rows are ignored.
-4. **Handwriting** (Dish, Qty, Other instructions) is read by a vision API **only if `ANTHROPIC_API_KEY` is set**. The key is never stored in the code. Without a key, or if the service fails, those fields stay blank, and the screen shows a picture of each row so the user types them. Standard Tesseract OCR isn't used, because it isn't reliable on handwriting.
+4. **Handwriting** (Dish, Qty, Other instructions) is read by a vision API **only if a key is set**: `GEMINI_API_KEY` (Google Gemini, which has a free tier, used first) or `ANTHROPIC_API_KEY` (paid). The key is never stored in the code. Without a key, or if the service fails, those fields stay blank, and the screen shows a picture of each row so the user types them. Standard Tesseract OCR isn't used, because it isn't reliable on handwriting.
 
 ### Human verification (mandatory)
 The verification screen shows:
@@ -140,11 +140,12 @@ After saving, the confirmed orders go straight to the existing `cluster_orders()
 pip install -r requirements.txt
 streamlit run ocr_app.py
 ```
-Optional, so the handwriting is read automatically (use your own key, never commit it):
+Optional, so the handwriting is read automatically. Use your own key and never commit it. **Free option:** create a Gemini key at Google AI Studio (aistudio.google.com, "Get API key"), then:
 ```bash
-export ANTHROPIC_API_KEY=your-key            # Git Bash / Linux / macOS
-$env:ANTHROPIC_API_KEY="your-key"            # Windows PowerShell
+export GEMINI_API_KEY=your-key               # Git Bash / Linux / macOS
+$env:GEMINI_API_KEY="your-key"               # Windows PowerShell
 ```
+`ANTHROPIC_API_KEY` works the same way (paid). Free-tier requests are rate-limited, so if you see a 429 message, wait a minute. Google's free tier may use what you send to improve its products. The pad has no student names, but check this is acceptable.
 Print the pad from `order_pad.html` first. If the tick boxes ever change, reprint it, so the printed pad matches `order_pad_layout.json`.
 
 ### How it was tested
@@ -165,7 +166,7 @@ Needs Python 3.8+. No packages to install.
 python canteen_tokens.py            # reads data.csv in this folder
 python canteen_tokens.py other.csv  # or any CSV with the same columns
 python order_clustering.py          # batch preparation on its own
-python -m unittest -v               # runs all 89 tests
+python -m unittest -v               # runs all 91 tests
 streamlit run ocr_app.py            # photo import (pip install -r requirements.txt first)
 ```
 
@@ -195,9 +196,9 @@ Open `order_pad.html` in a browser and print it (A4, landscape).
 | `OBSERVED_EXTRAS` | Spicy+, Less spicy, Cheese+, No onion, No corn, Less oil | extras from my observations |
 
 ## Tests
-89 tests (standard library `unittest`). `python -m unittest -v` runs all three files.
+91 tests (standard library `unittest`). `python -m unittest -v` runs all three files.
 
-**`test_order_ocr.py` (22 tests)** uses the synthetic photos and never touches the real `data.csv`. It covers:
+**`test_order_ocr.py` (24 tests)** uses the synthetic photos and never touches the real `data.csv`. It covers:
 - a straight scan and tilted, upside-down and sideways photos
 - a blank pad, a photo with no table, and a file that isn't an image
 - leaving text for the user when there's no API key

@@ -7,8 +7,9 @@ Upload photo -> read the form -> CHECK AND CORRECT every row -> Confirm and Save
 -> data.csv -> existing cluster_orders() -> batch + individual preparation.
 
 Nothing is written to data.csv until the user presses "Confirm and Save".
-Handwriting is read automatically only if ANTHROPIC_API_KEY is set; otherwise
-the ticks are read automatically and the user types the dish names.
+Handwriting is read automatically only if GEMINI_API_KEY (free tier) or
+ANTHROPIC_API_KEY is set; otherwise the ticks are read automatically and the
+user types the dish names.
 """
 
 import datetime
@@ -32,9 +33,10 @@ except ocr.OcrError as e:
     st.error(str(e))
     st.stop()
 
-api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+provider, api_key = ocr.handwriting_key()
 if api_key:
-    st.info("Handwriting will be read automatically. Check every value before saving.")
+    name = "Google Gemini (free tier)" if provider == "gemini" else "Claude"
+    st.info(f"Handwriting will be read automatically by {name}. Check every value before saving.")
 else:
     st.info("No API key set: tick boxes are read automatically, and you type the dish "
             "names from the row pictures.")
@@ -58,7 +60,7 @@ if state.get("key") != key:                       # a new photo: start again
 if state.result is None and state.error is None:
     with st.spinner("Reading the form..."):
         try:
-            state.result = ocr.read_order_pad(data, layout, api_key or None)
+            state.result = ocr.read_order_pad(data, layout, api_key or None, provider)
         except ocr.OcrError as e:
             state.error = str(e)
 
