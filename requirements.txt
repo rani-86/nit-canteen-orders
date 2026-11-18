@@ -1,0 +1,7 @@
+# Only needed for the photo import (order_ocr.py, ocr_app.py).
+# canteen_tokens.py and order_clustering.py use the Python standard library only.
+opencv-python-headless>=4.8
+numpy>=1.24
+pillow>=10.0
+streamlit>=1.35
+pandas>=2.0

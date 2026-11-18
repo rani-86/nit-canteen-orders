@@ -1,0 +1,73 @@
+{
+  "note": "SYNTHETIC test fixture - not real orders",
+  "layout": {
+    "rows": 25,
+    "ticks": [
+      "Half",
+      "Parcel",
+      "Corn",
+      "Spicy+",
+      "Less spicy",
+      "Cheese+",
+      "No onion",
+      "No corn",
+      "Less oil"
+    ],
+    "columns": [
+      "No.",
+      "Dish",
+      "Qty",
+      "Half",
+      "Parcel",
+      "Corn",
+      "Spicy+",
+      "Less spicy",
+      "Cheese+",
+      "No onion",
+      "No corn",
+      "Less oil",
+      "Other instructions"
+    ]
+  },
+  "filled": {
+    "1": {
+      "dish": "veg maggi"
+    },
+    "2": {
+      "dish": "veg maggi",
+      "ticks": [
+        "Half"
+      ]
+    },
+    "3": {
+      "dish": "veg maggi"
+    },
+    "4": {
+      "dish": "veg maggi",
+      "ticks": [
+        "Parcel"
+      ]
+    },
+    "5": {
+      "dish": "egg fried rice",
+      "ticks": [
+        "Spicy+",
+        "No onion"
+      ]
+    },
+    "6": {
+      "dish": "veg maggi",
+      "qty": "2"
+    },
+    "7": {
+      "dish": "chicken noodles",
+      "other": "extra sauce"
+    },
+    "8": {
+      "dish": "veg maggi",
+      "faint": [
+        "Cheese+"
+      ]
+    }
+  }
+}

@@ -1,4 +1,4 @@
-# NIT Canteen: order mix-up checker, numbered order pad and batch preparation
+# NIT Canteen: order mix-up checker, numbered order pad, batch preparation and photo import
 
 **Place:** NIT Canteen, NIT Jamshedpur campus (night canteen)
 **Person:** Kamal Singh ("Canteen Bhaiya"), order-taker. He takes orders, packs, garnishes and calls out names; a second person cooks.
@@ -17,7 +17,7 @@ More detail: [research.md](research.md) · [fieldwork.md](fieldwork.md) · raw d
 
 ## The solution (physical, not digital)
 **A numbered order pad + matching numbered tokens.**
-- Each order goes on a numbered row of the pad: name or ID, dish, qty, half/full, parcel/dine-in, ticked extras, and "Other instructions".
+- Each order goes on a numbered row of the pad. Kamal writes **only the dish**. Half, parcel and extras are ticked **only if needed**, because a blank means the usual order (full plate, dine-in, no extras, qty 1). Anything else goes in "Other instructions".
 - The student gets a token with the same number. When the food is ready, Kamal calls the number and takes the token back.
 - The written row tells the cook exactly what to make, which addresses problem 1. The token number links the plate to the student, which addresses problem 2.
 - Batch cooking hint: when 4+ students order the same dish with no customization, the cook may make those orders together (the canteen's own rule), but each plate still goes out under its own number.
@@ -36,7 +36,12 @@ More detail: [research.md](research.md) · [fieldwork.md](fieldwork.md) · raw d
 3. **Writes a numbered token slip** for every readable order (`slips.txt`). Each slip shows its `data.csv` row so it can be traced to the notepad photo.
 4. **Recommends a token inventory** from timestamped orders: the most orders outstanding at once, × 1.25, rounded up. If there aren't enough timestamped orders, it says so. It never generates timestamps or assumes a peak.
 5. **Suggests batch preparation** (`order_clustering.py`) by applying the canteen's own cooking rule. It writes `batch_report.csv` and `individual_orders.csv`. [Details below.](#batch-preparation)
-6. **Generates the printable order pad** (`order_pad.html`, one A4 landscape page, 25 numbered rows).
+6. **Generates the printable order pad** (`order_pad.html`, one A4 landscape page, 25 numbered rows):
+   - Columns: No. | Dish | Qty | **Tick only if needed** (Half, Parcel, then the extras) | Other instructions.
+   - Most orders need just the dish written. A tick is only for something different from the usual.
+   - Rows are shaded alternately so a row is easy to follow across a busy page.
+   - There's no name column: the token number already links the order to the student.
+7. **Imports a filled pad from a photo (optional)** (`ocr_app.py` + `order_ocr.py`): upload a photo, check every row, **Confirm and Save** to `data.csv`, and see batch suggestions from the existing `cluster_orders()`. [Details below.](#reading-a-filled-pad-from-a-photo)
 
 ![Order pad preview](order_pad_preview.png)
 
@@ -58,6 +63,7 @@ This is the canteen's existing practice, from my conversation with the staff (se
 - Fewer than 4 such orders → prepared individually.
 - Orders with any customization → prepared separately, never combined automatically.
 - Different dishes are never grouped.
+- One batch holds **at most 6 plates**, and **half and full plates can be combined**. The cook confirmed both when I asked.
 
 **A batch means cooking together, nothing more.** Every portion keeps its original order/token number and is plated, packed and handed over separately.
 
@@ -68,26 +74,89 @@ This is the canteen's existing practice, from my conversation with the staff (se
    - Anything written in `modifications` → **customized**, individual.
    - `modifications` column missing from the file → customization **unknown**, individual. This is the safe choice: an unknown order is never batched.
 3. **Group the remaining orders** by notepad page + dish. "Same page" is the default scope, because orders on different pages probably weren't waiting at the same time.
-4. **4 or more orders in a group** → a suggested batch. Fewer → each one is prepared individually ("only N compatible orders").
-5. **The rule counts orders (students), not plates.** One student ordering 4 plates isn't a batch. Total quantity (the sum of `qty`) is reported separately, with unknown quantities counted apart.
-6. **Original order IDs** are kept exactly as written, in their original order. Every order appears in exactly one of the two reports.
-7. **No time window is used to form batches.** If every order in a batch has `time_ordered`, the report shows how many minutes apart they were ordered, and adds a note if that's over `REVIEW_WINDOW_MIN` (10). This is only a prompt to check, not a validated rule.
+4. **Check plates.** An order whose `qty` is unknown can't be checked against the 6-plate limit, so it's prepared individually. So is one order of more than 6 plates.
+5. **4 or more orders left in a group** → fill batches **in the order the orders were taken**, up to 6 plates each. Any leftover set of 4+ orders becomes another batch, and fewer than 4 are prepared individually. Example: 10 single plates → batch of 6 + batch of 4; 9 → batch of 6 + 3 individual.
+6. **The 4+ rule counts orders (students), not plates.** One student ordering 4 plates isn't a batch. Total plates are reported for each batch.
+7. **Original order IDs** are kept exactly as written, in their original order. Every order appears in exactly one of the two reports.
+8. **No time window is used to form batches.** If every order in a batch has `time_ordered`, the report shows how many minutes apart they were ordered, and adds a note if that's over `REVIEW_WINDOW_MIN` (10). This is only a prompt to check, not a validated rule.
 
 ### Settings (top of `order_clustering.py`)
 | Setting | Default | Meaning |
 |---|---|---|
 | `MIN_BATCH_SIZE` | 4 | orders needed for a batch suggestion: change it here only |
+| `MAX_BATCH_PLATES` | 6 | most plates in one batch (confirmed by the cook) |
 | `ALLOW_CUSTOMIZED_IN_BATCH` | False | the canteen's rule keeps customized orders separate |
 | `SEPARATE_PACKING` | True (always) | the script refuses to run if this is set to False |
 | `PRESERVE_ORDER_NUMBERS` | True (always) | the script refuses to run if this is set to False |
 | `GROUP_BY_PAGE` | True | only batch orders written on the same notepad page |
-| `SPLIT_BY_PORTION` | False | True = half and full plates batched separately |
+| `SPLIT_BY_PORTION` | False | the cook confirmed half and full plates can be combined |
 | `REVIEW_WINDOW_MIN` | 10 | only used to comment on timestamped batches |
 
 ### Result on my data
-- **No batch is suggested.** No page has 4+ uncustomized orders of one dish. The 21 orders go to `individual_orders.csv`: 15 with too few compatible orders, 3 customized (rows 11, 12, 13), and 3 with an unreadable dish (rows 4, 9, 19). `batch_report.csv` has only its header row.
-- **How much the scope matters:** with `GROUP_BY_PAGE = False` (as if all 21 orders were open at once), there would be **one batch: veg noodles (?), orders 1, 8, 18, 20**. Two of those have an unreadable portion and quantity. With `SPLIT_BY_PORTION = True` as well, there would be no batch.
+- **No batch is suggested.** No page has 4+ uncustomized orders of one dish. All 21 orders go to `individual_orders.csv`:
+  - 11 with too few compatible orders
+  - 4 with an unreadable quantity (rows 8, 10, 15, 20)
+  - 3 customized (rows 11, 12, 13)
+  - 3 with an unreadable dish (rows 4, 9, 19)
+
+  `batch_report.csv` has only its header row.
+- **The scope doesn't change it either.** With `GROUP_BY_PAGE = False` (as if all 21 orders were open at once), veg noodles rows 1, 8, 18 and 20 would match. But rows 8 and 20 have an unreadable quantity, so only 2 orders can be checked against the 6-plate limit, and there's still no batch.
 - **Time window:** not analysed. None of these orders have `time_ordered`.
+
+## Reading a filled pad from a photo
+After a rush, Kamal still writes on paper. Someone then photographs the filled pad and the app turns it into data: no typing whole orders into an app during the rush.
+
+```
+Upload photo → read the form → CHECK AND CORRECT every row → Confirm and Save → data.csv → cluster_orders() → batch + individual preparation
+```
+
+### How the photo is read
+1. **Find and straighten the table.** The grid lines form one connected block of ink, so the app finds that block, takes its 4 corners and straightens it. This handles a tilted or angled photo, sideways and upside-down photos, and uneven light (thanks to adaptive thresholding).
+2. **Find the grid.** The order number is **never read from the handwriting**. It comes from the row's position on the printed pad. The pad's columns are read from `order_pad_layout.json`, which `canteen_tokens.py` writes whenever it prints the pad.
+3. **Tick boxes** (Half, Parcel and the extras) use plain image processing, not AI: the share of dark pixels in each cell. A clear tick counts as ticked; a faint mark is flagged as "faint mark" for the user to decide. Completely empty rows are ignored.
+4. **Handwriting** (Dish, Qty, Other instructions) is read by a vision API **only if `ANTHROPIC_API_KEY` is set**. The key is never stored in the code. Without a key, or if the service fails, those fields stay blank, and the screen shows a picture of each row so the user types them. Standard Tesseract OCR isn't used, because it isn't reliable on handwriting.
+
+### Human verification (mandatory)
+The verification screen shows:
+- the original photo
+- an editable table of every row read (rows can be fixed, added or deleted)
+- a **Check** column for anything doubtful (faint marks, unsure readings, writing that still needs typing)
+- a picture of each flagged row
+
+Nothing is saved until **Confirm and Save** is pressed. Saving is refused if:
+- a row has no dish, or a bad quantity, or two rows share an order number;
+- **writing was seen on the photo but the field was left blank.** Unknown information can't quietly become "no customization". Type it, or write `?`, which keeps the order out of batches.
+
+### What gets saved
+- **Only confirmed rows,** appended to `data.csv` with its existing columns. The original rows are never changed.
+- The pad's order number is kept in `row_id` as date/page/number (e.g. `2026-11-19/p1/07`), and `source` is `orderpad_<date>_p<page>`, so each pad page is its own group.
+- Half → `portion`, Parcel → `parcel`, and ticked extras + Other → `modifications`. A blank Qty means 1, as printed on the pad.
+- **Duplicates are blocked:** importing the same page twice saves nothing the second time.
+
+After saving, the confirmed orders go straight to the existing `cluster_orders()` with the same rules (4+ orders, max 6 plates, customized orders separate, every order keeps its number). The screen shows Batch Preparation, Individual Preparation, downloadable CSVs, and counts of extracted, verified, saved, batched and individual orders.
+
+### Run it
+```bash
+pip install -r requirements.txt
+streamlit run ocr_app.py
+```
+Optional, so the handwriting is read automatically (use your own key, never commit it):
+```bash
+export ANTHROPIC_API_KEY=your-key            # Git Bash / Linux / macOS
+$env:ANTHROPIC_API_KEY="your-key"            # Windows PowerShell
+```
+Print the pad from `order_pad.html` first. If the tick boxes ever change, reprint it, so the printed pad matches `order_pad_layout.json`.
+
+### How it was tested
+- **There are no real filled-pad photos yet,** so the tests use clearly labelled **synthetic** photos in `tests/fixtures/`, made by `tests/make_synthetic_fixtures.py`. That script prints the real pad, writes 8 made-up orders in a script-style font, and turns it into a tilted, angled, unevenly lit "phone photo" on a dark desk. These are test images, not data, and are never saved to `data.csv`.
+- On these photos, every tick is read in the right row and column, even when the photo is tilted, sideways or upside down. The faint mark is flagged, a blank pad gives 0 rows, and a non-pad image gives a clear error.
+- **The app itself was tested in a browser:**
+  - uploading the photo shows the verification table;
+  - Confirm and Save is refused while dishes are missing;
+  - after the dishes were typed, 8 orders were saved;
+  - the batch shown was veg maggi 01, 02, 03, 04, 06 (6 plates), with 05, 07 and 08 individual;
+  - importing the same photo again saved nothing.
+- **Still needed:** a real photo of a pad filled in by hand with a normal pen. The ink thresholds (`TICK_INK`, `UNSURE_BAND`, `TEXT_INK` at the top of `order_ocr.py`) were tuned on synthetic images only.
 
 ## How to run
 Needs Python 3.8+. No packages to install.
@@ -96,7 +165,8 @@ Needs Python 3.8+. No packages to install.
 python canteen_tokens.py            # reads data.csv in this folder
 python canteen_tokens.py other.csv  # or any CSV with the same columns
 python order_clustering.py          # batch preparation on its own
-python -m unittest -v               # runs all 58 tests
+python -m unittest -v               # runs all 89 tests
+streamlit run ocr_app.py            # photo import (pip install -r requirements.txt first)
 ```
 
 Open `order_pad.html` in a browser and print it (A4, landscape).
@@ -125,14 +195,24 @@ Open `order_pad.html` in a browser and print it (A4, landscape).
 | `OBSERVED_EXTRAS` | Spicy+, Less spicy, Cheese+, No onion, No corn, Less oil | extras from my observations |
 
 ## Tests
-58 tests (standard library `unittest`). `python -m unittest -v` runs both files.
+89 tests (standard library `unittest`). `python -m unittest -v` runs all three files.
 
-**`test_order_clustering.py` (23 tests)** covers:
+**`test_order_ocr.py` (22 tests)** uses the synthetic photos and never touches the real `data.csv`. It covers:
+- a straight scan and tilted, upside-down and sideways photos
+- a blank pad, a photo with no table, and a file that isn't an image
+- leaving text for the user when there's no API key
+- parsing the handwriting reply, highlighting unsure readings, and an API failure becoming a warning rather than a crash
+- the checks that block saving
+- saving: order numbers kept, customizations joined, no duplicates, original rows untouched, and the file still readable by `canteen_tokens.py`
+- one end-to-end run: photo → user's corrections → save → `cluster_orders()`
+
+**`test_order_clustering.py` (31 tests)** covers:
 - exactly 4 plain orders, 5 orders, and 3 orders
 - 4 orders where one is customized
 - different dishes never combined
 - capitalization and spacing in dish names, and unsure readings not merging with certain ones
-- quantities added up while the rule counts orders, and one student ordering 4 plates
+- quantities added up while the rule counts orders, one student ordering 4 plates, and unknown quantities
+- the 6-plate limit: exactly 6, 9 orders (6 + 3 left over), 10 orders (6 + 4), never over 6, one order bigger than a batch, half and full combined, and an invalid capacity setting
 - empty dataset
 - missing customization field and missing `modifications` column
 - missing dish name
@@ -142,13 +222,13 @@ Open `order_pad.html` in a browser and print it (A4, landscape).
 - CSV report output
 - the real-data result
 
-**`test_canteen_tokens.py` (35 tests)** covers:
+**`test_canteen_tokens.py` (36 tests)** covers:
 - **Row checks:** bad values, duplicates, empty item, qty 0 / negative, served before ordered.
 - **Reading files:** malformed rows, missing required and optional columns, empty dataset, empty file, missing file.
 - **Times:** after-midnight times, and the busiest-moment count checked against an example worked out by hand.
 - **Tokens:** rounding up (4 → 5, 3.75 → 4, 8.75 → 9), a floating-point case (100 × 1.1 must give 110, not 111), and sorting out missing or incomplete timestamps.
 - **Conflicts:** customization, identification and unclassifiable pairs, unreadable extras not counted as differences, the risk percentage, and an empty dataset.
-- **Pad:** the tick-box rules and every required field on the pad.
+- **Pad:** the tick-box rules and every column on the pad, including the "blank means the usual" note.
 - **A real-data test** that checks the numbers published below (21 rows, 18 readable, 8 = 44%, the exact rows in each category). If `data.csv` or the logic changes, it fails.
 
 ## Real output (on my data.csv)
@@ -204,12 +284,12 @@ Orders with both valid timestamps: 0
 Token requirement can't be calculated yet: need at least 5 orders with
 time_ordered and time_served. No timestamps are assumed or generated.
 
-BATCH PREPARATION (rule: 4+ orders of the same dish, no customization; scope: same notepad page)
+BATCH PREPARATION (rule: 4+ orders of the same dish, no customization, max 6 plates; scope: same notepad page)
 Batch = cook together only. Every order is still packed and handed over
 separately under its own number.
 ------------------------------------------------------------------
 Suggested batches: none - no dish had 4+ uncustomized orders in the same group.
-Individual preparation: 21 orders  (too few compatible orders: 15; dish name missing or unreadable: 3; customized: 3)
+Individual preparation: 21 orders  (too few compatible orders: 11; dish name missing or unreadable: 3; quantity unknown: 4; customized: 3)
 Batch reports written to batch_report.csv and individual_orders.csv.
 
 Token slips for 18 orders written to slips.txt.
@@ -234,14 +314,16 @@ Order pad with 25 numbered rows written to order_pad.html.
 - **One evening, not exam week.** The rush during exams is heavier.
 - **Batching depends on "no customization recorded".** Kamal rarely writes spoken extras, so some "plain" orders may really have had an extra. In practice the cook would still hear about it at the counter, but the data can't show it.
 - **The batch scope changes the answer.** Same page gives 0 batches; all pages gives 1. Neither is a measured "waiting at the same time", which needs timestamps.
-- **Half and full plates are batched together by default,** because the rule I was told doesn't mention portions. Whether the cook really combines them still needs checking.
+- **The plate count only works with a readable quantity.** Orders with `qty` "?" are left out of batches. On a real pad with clear quantities this wouldn't happen, but in my transcribed data it removes 4 orders from batching.
+- **An edge case I haven't confirmed:** if 4 students order 8 plates of the same dish, the script follows the rules literally. The first 6 plates (3 orders) are fewer than 4 orders, so nothing is batched. The cook might instead cook 6 together and make the rest separately.
 
 **Real-world validation still needed (none of this has been done yet):**
 - **The order pad and tokens have not been tested by Kamal.** The next step is to try the printed pad for one rush and see whether he actually fills the rows and ticks the boxes while busy.
 - Record 20+ orders with `time_ordered` and `time_served` during a rush, so the token count has real data behind it.
 - Confirm with Kamal what "Mixed", the struck-through lines and the circled numbers on his pad mean.
+- Test the photo import on a real hand-filled pad and adjust the ink thresholds. Check who would take the photo and when (after the rush, not during it). With an API key, the photo is sent to an outside service; the pad has no student names, but this should still be agreed with the canteen.
 - Check whether students keep and return the tokens.
-- Confirm the batching details with the cook: whether half and full plates are combined, whether there's a maximum batch size (pan capacity), and how long orders can wait to join a batch. Then record timestamps to see if a time window would help. No window has been validated.
+- Ask the cook what he does when 4+ orders add up to more than 6 plates, and how long orders can wait to join a batch. Then record timestamps to see if a time window would help. No window has been validated.
 
 ## Where else this could work
 Other campus counters with customised orders and long waits, like Dosa Corner or Nescafe.
