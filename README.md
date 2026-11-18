@@ -330,7 +330,7 @@ Order pad with 25 numbered rows written to order_pad.html.
 Other campus counters with customised orders and long waits, like Dosa Corner or Nescafe.
 
 ## Demo video
-3-minute screen recording of the tool running: [add link]
+3-minute screen recording of the tool running: https://youtu.be/5-fSyvHf7S8
 
 ## AI use
 I used AI for research, the first transcription of the notepad photos (which I then checked) and the code. The chats are exported in [`ai-chats/`](ai-chats/). The fieldwork visits, the conversation with Kamal and `reflection.md` are my own.
