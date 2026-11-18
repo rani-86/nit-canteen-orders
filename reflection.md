@@ -1,0 +1,9 @@
+# Reflection
+
+So the initial mistake I have done, initially I have focused on order confusion and handwritten notes without fully understanding the cook's preparation workflow. And in initial, I was more focused on that the order reading one, but after the modifications, I got to know that just reading the orders, if a one thing, but adding to it like the main thing was the clustering, so they can save the time and make the order in a better and efficient way, as they are doing that, but a better app will be good for for getting the better solution.
+
+And what I changed if they are more identical orders, like 4 person have ordered fried rice at at the same time, but the numbering is different. So what will happen will they will cluster that order and make it at once. So there will be that will save the gas and the efforts by the cook. And even I have added that token one, that the tokens will be given to the students tokens will be given to the students, so that the right in a correct order the student can get the orders. Like the first who have ordered should get the order first.
+
+And design decision. So yes, we'll select the what I cut out is the unnecessary digital complexity that doesn't directly help Kamal handle the orders.
+
+And how like AI experience helped me. So AI helped me with the implementation and debugging, but there were some suggestions that need adjustment. Like they were giving a generic way, but I was even going through a real problem that whenever I order in the canteen, first, but other people got the order first because of the confusion that is so irritating. And actually creates a bad effect of the canteen, that I don't go there often for 2 to 3 days. So all of these has combinedly made me to develop this and there are some issues with the Gemini API that will be CBC
