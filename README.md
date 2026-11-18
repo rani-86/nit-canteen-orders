@@ -333,4 +333,4 @@ Other campus counters with customised orders and long waits, like Dosa Corner or
 3-minute screen recording of the tool running: https://youtu.be/5-fSyvHf7S8
 
 ## AI use
-I used AI for research, the first transcription of the notepad photos (which I then checked) and the code. The chats are exported in [`ai-chats/`](ai-chats/). The fieldwork visits, the conversation with Kamal and `reflection.md` are my own.
+I used AI for research, the first transcription of the notepad photos (which I then checked) and the code. The chats are linked in [`ai-chats/`](ai-chats/) ([main chat](https://claude.ai/share/1478dcb4-ee68-4ea3-8370-85909e2939bd)). The fieldwork visits, the conversation with Kamal and `reflection.md` are my own.
