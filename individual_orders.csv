@@ -1,22 +1,22 @@
 order_id,page,dish,portion,qty,customization,reason
-1,notepad_p1,veg noodles (?),half,1,none recorded,"no customization, but only 2 compatible order(s) - fewer than 4"
+1,notepad_p1,veg noodles (?),half,1,none recorded,"no customization, but only 1 compatible order(s) - fewer than 4"
 2,notepad_p1,egg noodles (?),half,1,none recorded,"no customization, but only 1 compatible order(s) - fewer than 4"
 3,notepad_p1,masala omelette,full,2,none recorded,"no customization, but only 1 compatible order(s) - fewer than 4"
 4,notepad_p1,,half,1,none recorded,dish name missing or unreadable
 5,notepad_p1,egg chowmein (?),half,1,none recorded,"no customization, but only 1 compatible order(s) - fewer than 4"
 6,notepad_p1,chicken noodles (?),half,1,none recorded,"no customization, but only 1 compatible order(s) - fewer than 4"
 7,notepad_p1,veg maggi,full,1,none recorded,"no customization, but only 1 compatible order(s) - fewer than 4"
-8,notepad_p1,veg noodles (?),?,?,none recorded,"no customization, but only 2 compatible order(s) - fewer than 4"
+8,notepad_p1,veg noodles (?),?,?,none recorded,quantity unknown - can't check batch capacity
 9,notepad_p1,,half,1,none recorded,dish name missing or unreadable
-10,notepad_p2,chicken noodles (?),?,?,none recorded,"no customization, but only 1 compatible order(s) - fewer than 4"
+10,notepad_p2,chicken noodles (?),?,?,none recorded,quantity unknown - can't check batch capacity
 11,notepad_p2,veg noodles (?),half,1,corn,customized - prepared separately
 12,notepad_p2,veg maggi,half,1,mixed; garlic (?),customized - prepared separately
 13,notepad_p2,veg noodles (?),half,1,corn+garlic; ? no,customized - prepared separately
 14,notepad_p2,chicken egg chowmein,half,1,none recorded,"no customization, but only 1 compatible order(s) - fewer than 4"
-15,notepad_p2,veg chowmein,?,?,none recorded,"no customization, but only 2 compatible order(s) - fewer than 4"
+15,notepad_p2,veg chowmein,?,?,none recorded,quantity unknown - can't check batch capacity
 16,notepad_p2,masala omelette,full,1,none recorded,"no customization, but only 1 compatible order(s) - fewer than 4"
-17,notepad_p2,veg chowmein,half,1,none recorded,"no customization, but only 2 compatible order(s) - fewer than 4"
-18,notepad_p2,veg noodles (?),half,1,none recorded,"no customization, but only 2 compatible order(s) - fewer than 4"
+17,notepad_p2,veg chowmein,half,1,none recorded,"no customization, but only 1 compatible order(s) - fewer than 4"
+18,notepad_p2,veg noodles (?),half,1,none recorded,"no customization, but only 1 compatible order(s) - fewer than 4"
 19,notepad_p2,,half,1,none recorded,dish name missing or unreadable
-20,notepad_p2,veg noodles (?),?,?,none recorded,"no customization, but only 2 compatible order(s) - fewer than 4"
+20,notepad_p2,veg noodles (?),?,?,none recorded,quantity unknown - can't check batch capacity
 21,notepad_p2,plain omelette (?),full,2,none recorded,"no customization, but only 1 compatible order(s) - fewer than 4"

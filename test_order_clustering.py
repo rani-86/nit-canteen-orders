@@ -82,11 +82,16 @@ class BatchRuleTests(unittest.TestCase):
 
     # 7
     def test_quantities_are_added_but_the_rule_counts_orders(self):
-        rows = [order("1", qty="2"), order("2", qty="1"), order("3", qty="3"), order("4", qty="?")]
+        rows = [order("1", qty="2"), order("2", qty="1"), order("3", qty="1"), order("4", qty="1")]
         batches, _ = oc.cluster_orders(rows)
-        self.assertEqual(batches[0]["total_quantity"], 6)
-        self.assertEqual(batches[0]["orders_with_unknown_qty"], 1)
+        self.assertEqual(batches[0]["total_quantity"], 5)
         self.assertEqual(batches[0]["compatible_orders"], 4)
+
+    def test_unknown_quantity_is_not_batched(self):
+        rows = [order(str(i)) for i in range(1, 5)] + [order("5", qty="?")]
+        batches, individual = oc.cluster_orders(rows)
+        self.assertEqual(batches[0]["order_ids"], ["1", "2", "3", "4"])
+        self.assertEqual(individual[0]["reason"], "quantity unknown - can't check batch capacity")
 
     def test_one_student_ordering_four_plates_is_not_a_batch(self):
         batches, individual = oc.cluster_orders([order("1", qty="4")])
@@ -152,6 +157,47 @@ class BatchRuleTests(unittest.TestCase):
         self.assertEqual(sorted(all_ids), ["01", "02", "03", "04", "05", "06", "07"])
 
 
+class CapacityTests(unittest.TestCase):
+    """The cook makes at most 6 plates in one batch; half and full can be combined."""
+    def test_six_plates_fit_in_one_batch(self):
+        rows = [order(str(i)) for i in range(1, 7)]
+        batches, individual = oc.cluster_orders(rows)
+        self.assertEqual(batches[0]["total_quantity"], 6)
+        self.assertEqual(individual, [])
+
+    def test_nine_orders_fill_one_batch_and_leftovers_follow_the_4_rule(self):
+        batches, individual = oc.cluster_orders([order(str(i)) for i in range(1, 10)])
+        self.assertEqual([b["order_ids"] for b in batches], [["1", "2", "3", "4", "5", "6"]])
+        self.assertEqual(ids(individual), ["7", "8", "9"])
+        self.assertTrue(all("left over" in e["reason"] for e in individual))
+
+    def test_ten_orders_make_two_batches_in_order_received(self):
+        batches, _ = oc.cluster_orders([order(str(i)) for i in range(1, 11)])
+        self.assertEqual([b["order_ids"] for b in batches],
+                         [["1", "2", "3", "4", "5", "6"], ["7", "8", "9", "10"]])
+
+    def test_no_batch_ever_goes_over_six_plates(self):
+        rows = [order(str(i), qty=q) for i, q in enumerate(["2", "2", "1", "2", "1", "1", "1"], 1)]
+        batches, _ = oc.cluster_orders(rows)
+        self.assertTrue(all(b["total_quantity"] <= 6 for b in batches))
+
+    def test_one_order_bigger_than_a_batch_is_prepared_individually(self):
+        rows = [order(str(i)) for i in range(1, 5)] + [order("5", qty="7")]
+        batches, individual = oc.cluster_orders(rows)
+        self.assertEqual(batches[0]["order_ids"], ["1", "2", "3", "4"])
+        self.assertIn("more than one batch holds", individual[0]["reason"])
+
+    def test_half_and_full_plates_are_combined(self):
+        rows = [order("1", portion="half"), order("2", portion="full"),
+                order("3", portion="half"), order("4", portion="full")]
+        batches, _ = oc.cluster_orders(rows)
+        self.assertEqual(batches[0]["portions"], {"half": 2, "full": 2})
+
+    def test_capacity_smaller_than_min_batch_is_rejected(self):
+        with self.assertRaises(ValueError):
+            oc.cluster_orders([order("1")], max_plates=3)
+
+
 class SettingsTests(unittest.TestCase):
     def test_min_batch_size_is_configurable(self):
         rows = [order(str(i)) for i in range(1, 4)]
@@ -193,16 +239,22 @@ class SettingsTests(unittest.TestCase):
 class RealDataTests(unittest.TestCase):
     """Guards the numbers published in the README."""
     def setUp(self):
-        self.rows, _, _ = ct.read_orders("data.csv")
+        rows, _, _ = ct.read_orders("data.csv")
+        # only my fieldwork rows - orders imported later from pad photos are excluded
+        self.rows = [r for r in rows if r["source"].startswith("notepad_")]
 
     def test_no_batch_on_the_same_page(self):
         batches, individual = oc.cluster_orders(self.rows, group_by_page=True)
         self.assertEqual(batches, [])
         self.assertEqual(len(individual), 21)
 
-    def test_one_batch_if_all_pages_were_open_together(self):
-        batches, _ = oc.cluster_orders(self.rows, group_by_page=False)
-        self.assertEqual([b["order_ids"] for b in batches], [["1", "8", "18", "20"]])
+    def test_still_no_batch_if_all_pages_were_open_together(self):
+        # veg noodles rows 1, 8, 18, 20 would match, but 8 and 20 have unreadable qty
+        batches, individual = oc.cluster_orders(self.rows, group_by_page=False)
+        self.assertEqual(batches, [])
+        reasons = {e["order_id"]: e["reason"] for e in individual}
+        self.assertIn("quantity unknown", reasons["8"])
+        self.assertIn("quantity unknown", reasons["20"])
 
 
 if __name__ == "__main__":

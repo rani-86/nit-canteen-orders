@@ -9,6 +9,7 @@ see fieldwork.md) to the orders in data.csv:
   - fewer than 4 such orders            -> prepared individually
   - any order with a customization      -> prepared separately, never combined
   - different dishes                    -> never grouped together
+  - one batch holds at most 6 plates; half and full plates can be combined
 
 Batching means COOKING together only. Every portion keeps its own order /
 token number and is plated, packed and handed over separately.
@@ -29,12 +30,13 @@ from canteen_tokens import parse_time, read_orders, unknown
 
 # ---------------- batching rules (change them here only) ----------------
 MIN_BATCH_SIZE = 4               # orders (students) needed for a batch suggestion
+MAX_BATCH_PLATES = 6             # most plates the cook makes in one batch
 ALLOW_CUSTOMIZED_IN_BATCH = False  # the canteen's rule: customized orders stay separate
 SEPARATE_PACKING = True          # ALWAYS True: batching is cooking together, not packing
 PRESERVE_ORDER_NUMBERS = True    # ALWAYS True: every portion keeps its own order/token no.
 
 GROUP_BY_PAGE = True             # only batch orders written on the same notepad page
-SPLIT_BY_PORTION = False         # True = half and full plates batched separately
+SPLIT_BY_PORTION = False         # cook confirmed half and full plates can be combined
 REVIEW_WINDOW_MIN = 10           # used ONLY to comment on timestamped batches;
                                  # not a rule, not validated by the cook
 
@@ -75,13 +77,16 @@ def quantity(row):
     return int(q) if q.isdigit() and int(q) > 0 else None
 
 
-def check_rules(min_batch):
+def check_rules(min_batch, max_plates):
     if not (SEPARATE_PACKING and PRESERVE_ORDER_NUMBERS):
         raise ValueError("SEPARATE_PACKING and PRESERVE_ORDER_NUMBERS must stay True: "
                          "a batch is cooked together but each order is packed and "
                          "handed over separately under its own number.")
     if min_batch < 2:
         raise ValueError("MIN_BATCH_SIZE must be at least 2.")
+    if max_plates < min_batch:
+        raise ValueError("MAX_BATCH_PLATES can't be smaller than MIN_BATCH_SIZE: "
+                         "every order is at least one plate, so no batch could ever form.")
 
 
 def ordered_span_minutes(group):
@@ -94,7 +99,7 @@ def ordered_span_minutes(group):
 
 
 def cluster_orders(rows, min_batch=None, allow_customized=None,
-                   group_by_page=None, split_by_portion=None):
+                   group_by_page=None, split_by_portion=None, max_plates=None):
     """Split orders into batch suggestions and individual preparation.
     Returns (batches, individual). Original order IDs are kept unchanged and
     in their original order. Arguments default to the settings above."""
@@ -102,7 +107,8 @@ def cluster_orders(rows, min_batch=None, allow_customized=None,
     allow_customized = ALLOW_CUSTOMIZED_IN_BATCH if allow_customized is None else allow_customized
     group_by_page = GROUP_BY_PAGE if group_by_page is None else group_by_page
     split_by_portion = SPLIT_BY_PORTION if split_by_portion is None else split_by_portion
-    check_rules(min_batch)
+    max_plates = MAX_BATCH_PLATES if max_plates is None else max_plates
+    check_rules(min_batch, max_plates)
 
     def entry(position, row, dish, reason):
         return {"_pos": position, "order_id": row.get("row_id", ""),
@@ -131,17 +137,10 @@ def cluster_orders(rows, min_batch=None, allow_customized=None,
         groups.setdefault(key, []).append((position, row))
 
     batches = []
-    for (page, dish, portion), members in groups.items():   # keeps first-seen order
+
+    def close_batch(page, dish, portion, members):
         group = [row for _, row in members]
-        if len(group) < min_batch:
-            for position, row in members:
-                individual.append(entry(
-                    position, row, dish,
-                    f"no customization, but only {len(group)} compatible order(s) "
-                    f"- fewer than {min_batch}"))
-            continue
         ids = [row.get("row_id", "") for row in group]
-        known_qty = [quantity(row) for row in group]
         span = ordered_span_minutes(group)
         recommendation = (f"Cook these {len(group)} orders together as one batch; "
                           f"plate, pack and hand over separately by order number "
@@ -153,14 +152,53 @@ def cluster_orders(rows, min_batch=None, allow_customized=None,
             "batch_id": f"B{len(batches) + 1}",
             "page": page if group_by_page else "all pages",
             "dish": dish + (f" ({portion})" if split_by_portion and portion else ""),
-            "total_quantity": sum(q for q in known_qty if q),
-            "orders_with_unknown_qty": sum(1 for q in known_qty if q is None),
+            "total_quantity": sum(quantity(row) for row in group),
             "compatible_orders": len(group),
             "portions": dict(Counter(row.get("portion") or "?" for row in group)),
             "order_ids": ids,
             "ordered_span_min": span,
             "recommendation": recommendation,
         })
+
+    for (page, dish, portion), members in groups.items():   # keeps first-seen order
+        # orders whose plate count is unknown or too big can't go in a batch
+        fits = []
+        for position, row in members:
+            q = quantity(row)
+            if q is None:
+                individual.append(entry(position, row, dish,
+                                        "quantity unknown - can't check batch capacity"))
+            elif q > max_plates:
+                individual.append(entry(position, row, dish,
+                                        f"{q} plates - more than one batch holds ({max_plates})"))
+            else:
+                fits.append((position, row))
+        if len(fits) < min_batch:
+            for position, row in fits:
+                individual.append(entry(
+                    position, row, dish,
+                    f"no customization, but only {len(fits)} compatible order(s) "
+                    f"- fewer than {min_batch}"))
+            continue
+        # fill batches in the order the orders were taken, up to max_plates each
+        chunks, current, plates = [], [], 0
+        for position, row in fits:
+            q = quantity(row)
+            if current and plates + q > max_plates:
+                chunks.append(current)
+                current, plates = [], 0
+            current.append((position, row))
+            plates += q
+        chunks.append(current)
+        for chunk in chunks:
+            if len(chunk) >= min_batch:
+                close_batch(page, dish, portion, chunk)
+            else:
+                for position, row in chunk:
+                    individual.append(entry(
+                        position, row, dish,
+                        f"left over after filling batches of up to {max_plates} plates; "
+                        f"only {len(chunk)} order(s) remain - fewer than {min_batch}"))
 
     individual.sort(key=lambda e: e["_pos"])
     for e in individual:
@@ -172,14 +210,14 @@ def write_reports(batches, individual, batch_path=BATCH_REPORT,
                   individual_path=INDIVIDUAL_REPORT):
     with open(batch_path, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
-        w.writerow(["batch_id", "page", "dish", "total_quantity", "orders_with_unknown_qty",
+        w.writerow(["batch_id", "page", "dish", "total_quantity",
                     "compatible_orders", "portions", "order_ids",
                     "ordered_time_span_min", "recommendation"])
         for b in batches:
             portions = "; ".join(f"{k} x{v}" for k, v in b["portions"].items())
             span = "" if b["ordered_span_min"] is None else b["ordered_span_min"]
             w.writerow([b["batch_id"], b["page"], b["dish"], b["total_quantity"],
-                        b["orders_with_unknown_qty"], b["compatible_orders"], portions,
+                        b["compatible_orders"], portions,
                         " ".join(b["order_ids"]), span, b["recommendation"]])
     with open(individual_path, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
@@ -192,15 +230,13 @@ def write_reports(batches, individual, batch_path=BATCH_REPORT,
 def print_summary(batches, individual):
     scope = "same notepad page" if GROUP_BY_PAGE else "whole dataset"
     print(f"\nBATCH PREPARATION (rule: {MIN_BATCH_SIZE}+ orders of the same dish, no "
-          f"customization; scope: {scope})")
+          f"customization, max {MAX_BATCH_PLATES} plates; scope: {scope})")
     print("Batch = cook together only. Every order is still packed and handed over")
     print("separately under its own number.")
     print("-" * 66)
     if batches:
         for b in batches:
-            qty = f"{b['total_quantity']}"
-            if b["orders_with_unknown_qty"]:
-                qty += f" + {b['orders_with_unknown_qty']} order(s) with unknown qty"
+            qty = f"{b['total_quantity']} plates"
             span = ("no timestamps" if b["ordered_span_min"] is None
                     else f"ordered within {b['ordered_span_min']} min")
             print(f"Suggested batch {b['batch_id']}: {b['dish'].upper()} ({b['page']})")
@@ -208,8 +244,11 @@ def print_summary(batches, individual):
     else:
         print("Suggested batches: none - no dish had "
               f"{MIN_BATCH_SIZE}+ uncustomized orders in the same group.")
-    reasons = Counter(e["reason"].split(" - ")[0] if "only" not in e["reason"]
-                      else "too few compatible orders" for e in individual)
+    def short(reason):
+        if "only" in reason:
+            return "too few compatible orders"
+        return reason.split(" - ")[0]
+    reasons = Counter(short(e["reason"]) for e in individual)
     print(f"Individual preparation: {len(individual)} orders  "
           f"({'; '.join(f'{k}: {v}' for k, v in reasons.items())})")
     timed = sum(1 for b in batches if b["ordered_span_min"] is not None)
